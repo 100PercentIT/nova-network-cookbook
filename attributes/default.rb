@@ -117,6 +117,7 @@ when "fedora", "redhat", "centos"
 	}
 	default["quantum"]["platform"]["folsom"] = {
 	    "mysql_python_packages" => [ "MySQL-python" ],
+            "postgresql_python_packages" => [ "python-psycopg2" ],
 	    "quantum_packages" => [ "openstack-quantum", "python-quantumclient" ],
 	    "quantum_api_service" => "openstack-quantum",
 	    "quantum_api_process_name" => "",
@@ -135,6 +136,7 @@ when "ubuntu"
 	}
 	default["quantum"]["platform"]["folsom"] = {
 	  "mysql_python_packages" => [ "python-mysqldb" ],
+          "postgresql_python_packages" => [ "python-psycopg2" ],
 	  "quantum_packages" => [ "quantum-server", "python-quantum", "quantum-common" ],
 	  "quantum_dhcp_packages" => [ "dnsmasq-base", "dnsmasq-utils", "libnetfilter-conntrack3", "quantum-dhcp-agent" ],
 	  "quantum_l3_packages" => ["quantum-l3-agent"],

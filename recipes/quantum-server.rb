@@ -17,8 +17,14 @@
 # limitations under the License.
 #
 ::Chef::Recipe.send(:include, Opscode::OpenSSL::Password)
-include_recipe "mysql::client"
-include_recipe "mysql::ruby"
+if node['db']['provider'] == 'mysql'
+  include_recipe "mysql::client"
+  include_recipe "mysql::ruby"
+end
+if node['db']['provider'] == 'postgresql'
+  include_recipe "postgresql::client"
+  include_recipe "postgresql::ruby"
+end
 include_recipe "osops-utils"
 
 if not node["package_component"].nil?
@@ -48,15 +54,34 @@ keystone = get_settings_by_role("keystone", "keystone")
 # Create db and user
 # return connection info
 # defined in osops-utils/libraries
-mysql_info = create_db_and_user("mysql", 
-node["quantum"]["db"]["name"],
-node["quantum"]["db"]["username"],
-node["quantum"]["db"]["password"])
+if node['db']['provider'] == 'mysql'
+  mysql_info = create_db_and_user("mysql", 
+				node["quantum"]["db"]["name"],
+				node["quantum"]["db"]["username"],
+				node["quantum"]["db"]["password"])
+end
+if node['db']['provider'] == 'postgresql'
+  postgresql_info = create_db_and_user("postgresql",
+                                node["quantum"]["db"]["name"],
+                                node["quantum"]["db"]["username"],
+                                node["quantum"]["db"]["password"])
 
-platform_options["mysql_python_packages"].each do |pkg|
+  postgresql_connect_ip = get_access_endpoint('postgresql-master', 'postgresql', 'db')["host"]
+end
+
+if node['db']['provider'] == 'mysql'
+  platform_options["mysql_python_packages"].each do |pkg|
     package pkg do
-        action :install
+      action :install
     end
+  end
+end
+if node['db']['provider'] == 'postgresql'
+  platform_options["postgresql_python_packages"].each do |pkg|
+    package pkg do
+      action :install
+    end
+  end
 end
 
 platform_options["quantum_packages"].each do |pkg|
@@ -152,25 +177,50 @@ template "/etc/quantum/api-paste.ini" do
 end
 
 local_ip = get_ip_for_net('nova', node)         ### FIXME
-template "/etc/quantum/plugins/openvswitch/ovs_quantum_plugin.ini" do
-    source "#{release}/ovs_quantum_plugin.ini.erb"
-    owner "root"
-    group "root"
-    mode "0644"
-    variables(
-        "db_ip_address" => mysql_info["host"],
-        "db_user" => node["quantum"]["db"]["username"],
-        "db_password" => node["quantum"]["db"]["password"],
-        "db_name" => node["quantum"]["db"]["name"],
-        "ovs_network_type" => node["quantum"]["ovs"]["network_type"],
-        "ovs_enable_tunneling" => node["quantum"]["ovs"]["tunneling"],
-        "ovs_tunnel_ranges" => node["quantum"]["ovs"]["tunnel_ranges"],
-        "ovs_integration_bridge" => node["quantum"]["ovs"]["integration_bridge"],
-        "ovs_tunnel_bridge" => node["quantum"]["ovs"]["tunnel_bridge"],
-        "ovs_debug" => node["quantum"]["debug"],
-        "ovs_verbose" => node["quantum"]["verbose"],
-        "ovs_local_ip" => local_ip
-    )
+
+if node['db']['provider'] == 'mysql'
+  template "/etc/quantum/plugins/openvswitch/ovs_quantum_plugin.ini" do
+      source "#{release}/ovs_quantum_plugin.ini.erb"
+      owner "root"
+      group "root"
+      mode "0644"
+      variables(
+          "db_ip_address" => mysql_info["host"],
+          "db_user" => node["quantum"]["db"]["username"],
+          "db_password" => node["quantum"]["db"]["password"],
+          "db_name" => node["quantum"]["db"]["name"],
+          "ovs_network_type" => node["quantum"]["ovs"]["network_type"],
+          "ovs_enable_tunneling" => node["quantum"]["ovs"]["tunneling"],
+          "ovs_tunnel_ranges" => node["quantum"]["ovs"]["tunnel_ranges"],
+          "ovs_integration_bridge" => node["quantum"]["ovs"]["integration_bridge"],
+          "ovs_tunnel_bridge" => node["quantum"]["ovs"]["tunnel_bridge"],
+          "ovs_debug" => node["quantum"]["debug"],
+          "ovs_verbose" => node["quantum"]["verbose"],
+          "ovs_local_ip" => local_ip
+      )
+  end
+end
+if node['db']['provider'] == 'postgresql'
+  template "/etc/quantum/plugins/openvswitch/ovs_quantum_plugin.ini" do
+      source "#{release}/ovs_quantum_plugin.postgresql.ini.erb"
+      owner "root"
+      group "root"
+      mode "0644"
+      variables(
+          "db_ip_address" => postgresql_connect_ip,
+          "db_user" => node["quantum"]["db"]["username"],
+          "db_password" => node["quantum"]["db"]["password"],
+          "db_name" => node["quantum"]["db"]["name"],
+          "ovs_network_type" => node["quantum"]["ovs"]["network_type"],
+          "ovs_enable_tunneling" => node["quantum"]["ovs"]["tunneling"],
+          "ovs_tunnel_ranges" => node["quantum"]["ovs"]["tunnel_ranges"],
+          "ovs_integration_bridge" => node["quantum"]["ovs"]["integration_bridge"],
+          "ovs_tunnel_bridge" => node["quantum"]["ovs"]["tunnel_bridge"],
+          "ovs_debug" => node["quantum"]["debug"],
+          "ovs_verbose" => node["quantum"]["verbose"],
+          "ovs_local_ip" => local_ip
+      )
+  end
 end
 
 # Get rabbit info
