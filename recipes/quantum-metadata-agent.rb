@@ -1,5 +1,5 @@
 # Cookbook Name:: nova-network
-# Recipe:: quantum-l3-agent
+# Recipe:: quantum-metadata-agent
 #
 # Copyright 2012, Rackspace US, Inc.
 #
@@ -16,8 +16,6 @@
 # limitations under the License.
 
 include_recipe "osops-utils"
-include_recipe "sysctl::default"
-include_recipe "nova-network::quantum-metadata-agent"
 
 if Chef::Config[:solo]
     Chef::Log.warn("This recipe uses search. Chef Solo does not support search.")
@@ -29,45 +27,33 @@ else
     release = "folsom"
 end
 
-sysctl 'net.ipv4.ip_forward' do
-    value '1'
-end
-
 platform_options = node["quantum"]["platform"][release]
 plugin = node["quantum"]["plugin"]
 
-platform_options["quantum_l3_packages"].each do |pkg|
+platform_options["quantum_metadata_packages"].each do |pkg|
     package pkg do
         action :install
         options platform_options["package_overrides"]
     end
 end
 
-service "quantum-l3-agent" do
-    service_name platform_options["quantum_l3_agent"]
+service "quantum-metadata-agent" do
+    service_name platform_options["quantum_metadata_agent"]
     supports :status => true, :restart => true
     action :nothing
 end
 
-execute "create external bridge" do
-	command "ovs-vsctl add-br #{node["quantum"]["ovs"]["external_bridge"]}"
-	action :run
-	not_if "ovs-vsctl show | grep 'Bridge br-ex'" ## FIXME
-end
-
 ks_admin_endpoint = get_access_endpoint("keystone-api", "keystone", "admin-api")
 quantum_info = get_settings_by_recipe("nova-network\\:\\:nova-controller", "quantum")
-#metadata_ip = get_ip_for_net("nova", search(:node, "recipes:nova-network\\:\\:nova-controller AND chef_environment:#{node.chef_environment}"))
 nova_info = get_access_endpoint("nova-api-os-compute", "nova", "api")
 metadata_ip = nova_info["host"]
 
-template "/etc/quantum/l3_agent.ini" do
-    source "#{release}/l3_agent.ini.erb"
+template "/etc/quantum/metadata_agent.ini" do
+    source "#{release}/metadata_agent.ini.erb"
     owner "root"
     group "root"
     mode "0644"
     variables(
-        "quantum_external_bridge" => node["quantum"][plugin]["external_bridge"],
         "nova_metadata_ip" => metadata_ip,
         "service_pass" => quantum_info["service_pass"],
         "service_user" => quantum_info["service_user"],
@@ -78,11 +64,8 @@ template "/etc/quantum/l3_agent.ini" do
         "keystone_path" => ks_admin_endpoint["path"],
         "quantum_debug" => node["quantum"]["debug"],
         "quantum_verbose" => node["quantum"]["verbose"],
-        "quantum_namespace" => node["quantum"]["use_namespaces"],
-        "quantum_plugin" => node["quantum"]["plugin"],
-	"l3_router_id" => node["quantum"]["l3"]["router_id"],
-	"l3_gateway_net_id" => node["quantum"]["l3"]["gateway_external_net_id"]
     )
-    notifies :restart, resources(:service => "quantum-l3-agent"), :immediately
-    notifies :enable, resources(:service => "quantum-l3-agent"), :immediately
+    notifies :restart, resources(:service => "quantum-metadata-agent"), :immediately
+    notifies :enable, resources(:service => "quantum-metadata-agent"), :immediately
 end
+

@@ -140,6 +140,7 @@ when "ubuntu"
 	  "quantum_packages" => [ "quantum-server", "python-quantum", "quantum-common" ],
 	  "quantum_dhcp_packages" => [ "dnsmasq-base", "dnsmasq-utils", "libnetfilter-conntrack3", "quantum-dhcp-agent" ],
 	  "quantum_l3_packages" => ["quantum-l3-agent"],
+	  "quantum_metadata_packages" => ["quantum-metadata-agent"],
 	  "quantum_api_service" => "quantum-server",
 	  "quantum-dhcp-agent" => "quantum-dhcp-agent",
 	  "quantum-l3-agent" => "quantum-l3-agent",
